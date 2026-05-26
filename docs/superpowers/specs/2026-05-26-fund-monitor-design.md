@@ -1,100 +1,100 @@
-# Domestic Fund Monitor Design
+# 国内基金监控设计
 
-Date: 2026-05-26
+日期：2026-05-26
 
-## Goal
+## 目标
 
-Build a server-side monitor for a user-defined list of domestic funds. The first version fetches public fund data, calculates daily movement and rule-based attention signals, and sends Feishu messages before the 15:00 purchase cutoff.
+构建一个运行在服务器上的国内基金监控工具，面向用户自定义的基金列表。第一版从公开基金数据源获取基金估值和净值信息，计算当日涨跌、规则化关注信号，并在支付宝 15:00 购买截止前通过飞书发送提醒。
 
-The system should be simple enough to deploy on a server as scheduled scripts, while keeping clean module boundaries so it can later grow into a long-running API service.
+系统应足够轻量，便于在服务器上用定时任务运行；同时保持清晰的模块边界，后续可以平滑扩展为常驻 API 服务。
 
-## Scope
+## 范围
 
-Included in version 1:
+第一版包含：
 
-- Monitor a configured list of fund codes.
-- Fetch public fund estimate/net-value data from a public source such as Eastmoney/Tiantian Fund.
-- Generate rule-based attention scores and explanations.
-- Send Feishu group robot webhook notifications.
-- Send the main actionable reminder before 15:00.
-- Send a post-market recap after 15:00.
-- Persist notification state locally to avoid duplicate alerts.
-- Run on a Linux server through cron or systemd timer.
+- 监控配置文件中的自选基金代码。
+- 从东方财富、天天基金等公开数据源获取基金估值和净值数据。
+- 生成规则化关注评分和原因说明。
+- 通过飞书群机器人 Webhook 发送通知。
+- 在 15:00 前发送主要操作窗口提醒。
+- 在 15:00 后发送收盘复盘摘要。
+- 在本地持久化通知状态，避免重复提醒。
+- 在 Linux 服务器上通过 cron 或 systemd timer 定时运行。
 
-Not included in version 1:
+第一版不包含：
 
-- Automatic full-market fund discovery.
-- Direct trading integration.
-- Personal cost-basis and position-aware recommendations.
-- Interactive Feishu application bot.
-- Guaranteed financial advice.
+- 全市场基金自动筛选。
+- 直接交易或下单能力。
+- 基于个人成本价和仓位的精细化建议。
+- 交互式飞书应用机器人。
+- 保证收益或确定性的投资建议。
 
-## Recommendation Semantics
+## 建议语义
 
-The system must not produce hard buy/sell commands. It should produce explainable, rule-based signals:
+系统不能输出强制性的买入或卖出指令，只输出可解释的规则化信号：
 
-- `score`: 0-100 attention score.
-- `status`: one of `watch`, `定投观察`, `谨慎追高`, `暂不操作`.
-- `reasons`: short factual explanations such as daily estimate movement, recent drawdown, or trend condition.
-- `risk_note`: a reminder that data may be delayed and the output is not investment advice.
+- `score`：0-100 的关注评分。
+- `status`：状态值，例如 `关注观察`、`定投观察`、`谨慎追高`、`暂不操作`。
+- `reasons`：简短事实原因，例如当日估值涨跌、近期回撤、趋势状态。
+- `risk_note`：风险提示，说明数据可能延迟，输出不构成投资建议。
 
-## Architecture
+## 架构
 
-The first version uses a lightweight Python scheduled-script architecture.
+第一版采用轻量 Python 定时脚本架构。
 
-Modules:
+模块划分：
 
-- `config`: Loads fund list, thresholds, Feishu webhook, and runtime settings.
-- `fund_data`: Fetches current estimate, latest net value, historical net values, and fund metadata.
-- `signals`: Converts raw fund data into scores, statuses, reasons, and alert decisions.
-- `notifier`: Defines a notification interface and implements Feishu webhook delivery.
-- `storage`: Stores recent signals and sent notification keys in a local SQLite database or JSON file.
-- `scheduler`: Provides command entry points for actionable reminders, post-market recaps, and optional intraday checks.
-- `logging`: Writes structured logs for data fetch failures, skipped non-trading days, and notification results.
+- `config`：加载基金列表、阈值、飞书 Webhook 和运行配置。
+- `fund_data`：获取当前估值、最新净值、历史净值和基金基础信息。
+- `signals`：将原始基金数据转换为评分、状态、原因和提醒决策。
+- `notifier`：定义通知接口，并实现飞书 Webhook 发送。
+- `storage`：在本地 SQLite 数据库或 JSON 文件中保存最近信号和已发送通知键。
+- `scheduler`：提供操作窗口提醒、收盘复盘和盘中检查的命令入口。
+- `logging`：记录数据拉取失败、非交易日跳过、通知发送结果等结构化日志。
 
-## Data Flow
+## 数据流
 
-1. A scheduled command starts on the server.
-2. Configuration is loaded from local config and environment variables.
-3. The command checks whether today is a trading day.
-4. Fund data is fetched for each configured code.
-5. Signal rules calculate score, status, reasons, and whether an alert should be sent.
-6. Storage is checked to prevent duplicate noisy alerts.
-7. Feishu messages are generated and sent through the notifier.
-8. Results and failures are logged.
+1. 服务器定时任务启动命令。
+2. 从本地配置文件和环境变量加载配置。
+3. 判断当天是否为交易日。
+4. 逐个基金代码拉取基金数据。
+5. 信号规则计算评分、状态、原因，并判断是否需要发送提醒。
+6. 查询本地状态，避免重复发送噪音提醒。
+7. 生成飞书消息，并通过通知模块发送。
+8. 记录运行结果和失败信息。
 
-## Notification Schedule
+## 通知计划
 
-Recommended server schedule:
+推荐服务器定时计划：
 
-- Trading days at 14:40: actionable reminder for decisions before the 15:00 cutoff.
-- Trading days between 13:30 and 14:50: optional threshold-triggered intraday alert, with per-fund daily rate limiting.
-- Trading days at 15:10: post-market recap. This message should summarize only and avoid same-day action wording.
-- Non-trading days: no default notification.
+- 交易日 14:40：发送操作窗口提醒，用于 15:00 前做决策。
+- 交易日 13:30 到 14:50：可选盘中阈值提醒，单只基金当天限流。
+- 交易日 15:10：发送收盘复盘摘要，只总结，不再使用当日操作建议语气。
+- 非交易日：默认不发送通知。
 
-## Signal Rules
+## 信号规则
 
-Initial rule set:
+初始规则集：
 
-- Daily estimate decline beyond a configurable threshold increases attention score.
-- Recent multi-day drawdown increases attention score.
-- Large same-day rise reduces buying enthusiasm and may mark `谨慎追高`.
-- High volatility or missing data reduces confidence.
-- A stable or mildly negative day can produce `定投观察` if configured.
+- 当日估值跌幅超过可配置阈值时，提高关注评分。
+- 近期多日回撤时，提高关注评分。
+- 当日大涨时降低买入热度，并可能标记为 `谨慎追高`。
+- 波动过大或数据缺失时降低置信度。
+- 平稳或小幅下跌时，如果配置允许，可标记为 `定投观察`。
 
-The rule engine should be deterministic, transparent, and covered by unit tests.
+规则引擎应保持确定性、透明性，并通过单元测试覆盖。
 
-## Configuration
+## 配置
 
-Configuration should avoid hard-coding secrets.
+配置应避免硬编码密钥。
 
-Suggested files and environment variables:
+建议使用的文件和环境变量：
 
-- `config/funds.yaml`: fund codes, display names, optional per-fund thresholds.
-- `.env`: `FEISHU_WEBHOOK_URL`, optional webhook signing secret.
-- `config/settings.yaml`: schedule mode, thresholds, timezone, storage path.
+- `config/funds.yaml`：基金代码、展示名称、可选的单基金阈值。
+- `.env`：`FEISHU_WEBHOOK_URL`，以及可选的 Webhook 签名密钥。
+- `config/settings.yaml`：运行模式、默认阈值、时区、存储路径。
 
-Example fund item:
+基金配置示例：
 
 ```yaml
 funds:
@@ -104,19 +104,19 @@ funds:
     cautious_rise_pct: 2.0
 ```
 
-## Deployment
+## 部署
 
-The first deployment target is a Linux server.
+第一版部署目标是 Linux 服务器。
 
-Recommended runtime:
+推荐运行环境：
 
-- Python 3.11 or newer.
-- Virtual environment.
-- Cron or systemd timer.
-- Logs written to `logs/fund-monitor.log`.
-- Local persistent state written to `data/fund-monitor.db` or `data/state.json`.
+- Python 3.11 或更高版本。
+- Python 虚拟环境。
+- cron 或 systemd timer。
+- 日志写入 `logs/fund-monitor.log`。
+- 本地持久化状态写入 `data/fund-monitor.db` 或 `data/state.json`。
 
-Cron shape:
+cron 示例：
 
 ```cron
 40 14 * * 1-5 fund-monitor remind
@@ -124,35 +124,34 @@ Cron shape:
 */30 13-14 * * 1-5 fund-monitor intraday
 ```
 
-The implementation should still check trading-day status internally because weekday cron alone does not account for holidays.
+实现内部仍需判断交易日，因为工作日 cron 无法覆盖节假日休市情况。
 
-## Error Handling
+## 错误处理
 
-- Data source failure: retry with backoff, then include a concise failure line in logs.
-- Partial data failure: continue processing other funds.
-- Feishu send failure: retry; if still failing, log the response status and body.
-- Invalid fund configuration: fail fast with a clear error.
-- Missing webhook: allow dry-run output for local validation, but fail in production mode.
+- 数据源失败：进行退避重试，最终失败时在日志中记录简洁错误。
+- 部分基金数据失败：继续处理其他基金。
+- 飞书发送失败：重试；仍失败时记录响应状态码和响应内容。
+- 基金配置无效：快速失败，并给出明确错误。
+- 缺少 Webhook：本地验证时允许 dry-run 输出，生产模式下直接失败。
 
-## Testing
+## 测试
 
-Minimum tests:
+最低测试范围：
 
-- Signal score and status for down day, up day, missing data, and recent drawdown.
-- Feishu message rendering without sending real network requests.
-- Configuration validation.
-- Duplicate notification suppression.
+- 下跌日、上涨日、数据缺失、近期回撤场景下的信号评分和状态。
+- 飞书消息渲染，测试时不发送真实网络请求。
+- 配置校验。
+- 重复通知抑制。
 
-Manual verification:
+手动验证：
 
-- Run a dry-run reminder command.
-- Run a dry-run recap command.
-- Send one test Feishu message after webhook is configured.
+- 运行一次 dry-run 操作窗口提醒命令。
+- 运行一次 dry-run 收盘复盘命令。
+- 配置 Webhook 后发送一次飞书测试消息。
 
-## GitHub Upload
+## GitHub 上传
 
-After implementation and verification, initialize a Git repository if needed, commit the code, and upload it to GitHub. The upload step needs either:
+实现和验证完成后，如果需要，初始化 Git 仓库、提交代码并上传到 GitHub。上传步骤需要以下任一信息：
 
-- An existing GitHub remote URL, or
-- Permission to create a new repository with the GitHub CLI.
-
+- 已存在的 GitHub 远程仓库地址。
+- 允许使用 GitHub CLI 创建新仓库。
