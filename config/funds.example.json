@@ -12,8 +12,11 @@
       "code": "000001",
       "name": "华夏成长混合",
       "owned": true,
+      "holding_shares": 1000,
       "cost_nav": 1.2,
       "target_position_pct": 20,
+      "target_profit_pct": 20,
+      "max_loss_pct": 12,
       "watch_drop_pct": -1.5,
       "cautious_rise_pct": 2.0
     },

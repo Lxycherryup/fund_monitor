@@ -52,7 +52,11 @@ def _load_fund(raw: Any, settings: Settings) -> FundConfig:
         name=str(raw.get("name", "")).strip(),
         owned=bool(raw.get("owned", False)),
         cost_nav=_optional_float(raw.get("cost_nav")),
+        holding_shares=_optional_float(raw.get("holding_shares")),
+        holding_amount=_optional_float(raw.get("holding_amount")),
         target_position_pct=_optional_float(raw.get("target_position_pct")),
+        target_profit_pct=_optional_float(raw.get("target_profit_pct")),
+        max_loss_pct=_optional_float(raw.get("max_loss_pct")),
         watch_drop_pct=float(raw.get("watch_drop_pct", settings.default_watch_drop_pct)),
         cautious_rise_pct=float(
             raw.get("cautious_rise_pct", settings.default_cautious_rise_pct)

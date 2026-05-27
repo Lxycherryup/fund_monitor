@@ -19,7 +19,11 @@ class FundConfig:
     name: str = ""
     owned: bool = False
     cost_nav: float | None = None
+    holding_shares: float | None = None
+    holding_amount: float | None = None
     target_position_pct: float | None = None
+    target_profit_pct: float | None = None
+    max_loss_pct: float | None = None
     watch_drop_pct: float = -1.5
     cautious_rise_pct: float = 2.0
 
@@ -53,3 +57,21 @@ class FundSignal:
     estimate_change_pct: float | None
     estimate_nav: float | None
     nav: float | None
+    estimated_amount: float | None = None
+    estimated_daily_profit: float | None = None
+    estimated_total_profit: float | None = None
+    estimated_total_profit_pct: float | None = None
+
+
+@dataclass(frozen=True)
+class CandidateFund:
+    code: str
+    name: str
+    score: int
+    status: str
+    reasons: list[str]
+    one_month_return_pct: float | None = None
+    three_month_return_pct: float | None = None
+    six_month_return_pct: float | None = None
+    one_year_return_pct: float | None = None
+    daily_change_pct: float | None = None

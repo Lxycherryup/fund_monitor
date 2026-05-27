@@ -9,9 +9,10 @@ from zoneinfo import ZoneInfo
 
 from .config import load_config
 from .fund_data import TiantianFundClient
-from .messages import render_recap, render_reminder
+from .messages import render_candidates, render_recap, render_reminder
 from .models import FundSnapshot
 from .notifier import FeishuNotifier
+from .screener import fetch_open_fund_rank, screen_open_funds
 from .signals import analyze_many
 from .storage import JsonStateStore
 
@@ -28,6 +29,16 @@ def main(argv: list[str] | None = None) -> int:
 
     config = load_config(args.config)
     now = _now(config.settings.timezone)
+    now_text = now.strftime("%Y-%m-%d %H:%M")
+
+    if args.command == "screen":
+        rows = fetch_open_fund_rank(args.screen_symbol)
+        owned_codes = {fund.code for fund in config.funds if fund.owned}
+        candidates = screen_open_funds(rows, owned_codes=owned_codes, limit=args.screen_limit)
+        notifier = FeishuNotifier(dry_run=args.dry_run)
+        notifier.send_text(render_candidates(candidates, now_text))
+        return 0
+
     if not args.ignore_trading_day and not _is_likely_trading_day(now):
         logging.info("skip non-trading weekday/weekend: %s", now.date().isoformat())
         return 0
@@ -35,7 +46,6 @@ def main(argv: list[str] | None = None) -> int:
     client = TiantianFundClient()
     snapshots = _fetch_all(config.funds, client)
     signals = analyze_many(config.funds, snapshots)
-    now_text = now.strftime("%Y-%m-%d %H:%M")
 
     if args.command == "recap":
         message = render_recap(signals, now_text)
@@ -68,8 +78,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fund-monitor")
     parser.add_argument(
         "command",
-        choices=["remind", "recap", "intraday", "test-feishu"],
-        help="运行模式：14:40 提醒、15:10 复盘、盘中阈值提醒或飞书测试",
+        choices=["remind", "recap", "intraday", "screen", "test-feishu"],
+        help="运行模式：14:40 提醒、15:10 复盘、盘中阈值提醒、候选基金筛选或飞书测试",
     )
     parser.add_argument(
         "--config",
@@ -77,6 +87,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="基金配置 JSON 文件路径，默认 config/funds.json",
     )
     parser.add_argument("--dry-run", action="store_true", help="只打印消息，不发送飞书")
+    parser.add_argument("--screen-limit", type=int, default=10, help="候选基金筛选返回数量")
+    parser.add_argument("--screen-symbol", default="全部", help="AKShare 开放式基金排行分类")
     parser.add_argument(
         "--ignore-trading-day",
         action="store_true",

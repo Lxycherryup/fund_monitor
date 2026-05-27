@@ -15,7 +15,11 @@
 - Linux 服务器、macOS 或其他可运行 Python 的环境
 - 飞书群机器人 Webhook
 
-当前运行时只使用 Python 标准库，不需要安装第三方依赖。
+基础持仓提醒只使用 Python 标准库。候选基金筛选使用 AKShare，需要安装依赖：
+
+```bash
+pip install -r requirements.txt
+```
 
 ## 配置基金
 
@@ -42,8 +46,11 @@ cp config/funds.example.json config/funds.json
       "code": "000001",
       "name": "我的持有基金",
       "owned": true,
+      "holding_shares": 1000,
       "cost_nav": 1.2,
-      "target_position_pct": 20
+      "target_position_pct": 20,
+      "target_profit_pct": 20,
+      "max_loss_pct": 12
     },
     {
       "code": "161725",
@@ -60,8 +67,11 @@ cp config/funds.example.json config/funds.json
 - `code`：基金代码。
 - `name`：展示名称，可留空，脚本会优先使用数据源返回名称。
 - `owned`：是否已持有。
+- `holding_shares`：持有份额。配置后脚本会用实时估值自动计算估算金额和盈亏。
 - `cost_nav`：持有基金的成本净值，可不填。
 - `target_position_pct`：目标仓位百分比，当前版本保留字段。
+- `target_profit_pct`：收益率达到该阈值时提示止盈观察。
+- `max_loss_pct`：亏损率达到该阈值时提示控制回撤。
 - `watch_drop_pct`：当日估值跌幅达到该阈值时提高关注评分。
 - `cautious_rise_pct`：当日估值涨幅达到该阈值时标记谨慎追高。
 
@@ -105,6 +115,12 @@ python3 -m fund_monitor.cli recap --config config/funds.json --ignore-trading-da
 python3 -m fund_monitor.cli intraday --config config/funds.json --ignore-trading-day --dry-run
 ```
 
+候选基金筛选：
+
+```bash
+python3 -m fund_monitor.cli screen --config config/funds.json --screen-limit 10 --dry-run
+```
+
 去掉 `--dry-run` 后会真实发送飞书消息。
 
 ## 服务器定时任务
@@ -134,4 +150,3 @@ https://fundgz.1234567.com.cn/js/{基金代码}.js
 ```
 
 该接口不是正式付费 API，可能存在延迟、字段变化或临时不可用。脚本会尽量失败隔离，但重要操作前请自行核对支付宝或基金平台显示的数据。
-

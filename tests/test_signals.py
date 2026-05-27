@@ -27,7 +27,7 @@ class SignalTests(unittest.TestCase):
 
         self.assertEqual(signal.group, "持有")
         self.assertGreaterEqual(signal.score, 70)
-        self.assertIn(signal.status, {"可补仓观察", "定投观察"})
+        self.assertIn(signal.status, {"加仓观察", "定投观察"})
         self.assertTrue(any("低于持仓成本" in reason for reason in signal.reasons))
 
     def test_watch_fund_drop_suggests_purchase_attention(self):
