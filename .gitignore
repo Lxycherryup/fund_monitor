@@ -1,5 +1,6 @@
 .env
 .DS_Store
+.conda-fund-monitor/
 config/funds.json
 data/
 logs/
