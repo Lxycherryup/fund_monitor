@@ -1,0 +1,8 @@
+.env
+config/funds.json
+data/
+logs/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
